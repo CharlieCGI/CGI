@@ -1,0 +1,57 @@
+<?php
+require __DIR__ . '/includes/functions.php';
+
+$config = app_config();
+date_default_timezone_set($config['timezone']);
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    header('Location: index.php');
+    exit;
+}
+
+$name = trim($_POST['name'] ?? '');
+$email = trim($_POST['email'] ?? '');
+$organisation = trim($_POST['organisation'] ?? '');
+$date = normalize_date($_POST['date'] ?? '');
+$time = normalize_time($_POST['time'] ?? '');
+$teamSize = (int) ($_POST['team_size'] ?? 0);
+$notes = trim($_POST['notes'] ?? '');
+
+if ($name === '' || $email === '' || $organisation === '' || $date === '' || $time === '') {
+    header('Location: index.php?error=' . urlencode('Please complete all required fields.'));
+    exit;
+}
+
+if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+    header('Location: index.php?error=' . urlencode('Please enter a valid email address.'));
+    exit;
+}
+
+if ($teamSize < 4 || $teamSize > 6) {
+    header('Location: index.php?error=' . urlencode('Team size must be between 4 and 6.'));
+    exit;
+}
+
+$availableSlots = get_available_slots($date);
+if (!in_array($time, $availableSlots, true)) {
+    header('Location: index.php?error=' . urlencode('That timeslot is no longer available. Please choose another slot.'));
+    exit;
+}
+
+$booking = [
+    'id' => bin2hex(random_bytes(8)),
+    'name' => $name,
+    'email' => $email,
+    'organisation' => $organisation,
+    'date' => $date,
+    'time' => $time,
+    'team_size' => $teamSize,
+    'notes' => $notes,
+    'submitted_at' => date('Y-m-d H:i:s'),
+];
+
+add_booking($booking);
+send_booking_email($booking);
+
+header('Location: index.php?success=1');
+exit;
